@@ -1,0 +1,9 @@
+{"id":1,"task":"Project skeleton + Phase 1 core (15 source files, config, map tool)","status":"in_progress","depends_on":[],"files":["Source/SSXPure/*","Config/*","Tools/make_map.py"],"priority":1}
+{"id":2,"task":"Build SSXPureEditor Win64 Development + fix compile errors","status":"pending","depends_on":[1],"files":["Source/SSXPure/*"],"priority":1}
+{"id":3,"task":"Create /Game/Maps/Main headless + boot smoke test + -ShotTest screenshot","status":"pending","depends_on":[2],"files":["Tools/make_map.py","Source/SSXPure/SSXPureGameMode.cpp"],"priority":1}
+{"id":4,"task":"Named trick dictionary (Indy/Melon/Method/Tailgrab/180-1080/Backflip/Frontflip/Rodeo/Cork)","status":"pending","depends_on":[3],"files":["Source/SSXPure/SSXPureSnowboarder.*","SSXPureHUD.cpp"],"priority":2}
+{"id":5,"task":"Procedural audio synth (wind by speed, board scrape, jump whoosh)","status":"pending","depends_on":[3],"files":["Source/SSXPure/SSXPureAudio.*"],"priority":2}
+{"id":6,"task":"Fidelity pass: camera FOV warp, screen shake, HUD juice, spray density","status":"pending","depends_on":[4],"files":["Source/SSXPure/SSXPureSnowboarder.*","SSXPureHUD.cpp"],"priority":2}
+{"id":7,"task":"Biome variation + procedural props (trees/rocks) + half-pipe features","status":"pending","depends_on":[3],"files":["Source/SSXPure/SSXPureTerrain.*","Source/SSXPure/SSXPureProp.*"],"priority":2}
+{"id":8,"task":"Game flow: start gate, finish/goal line, restart, run summary","status":"pending","depends_on":[6,7],"files":["Source/SSXPure/SSXPureGameMode.*","SSXPureHUD.cpp"],"priority":3}
+{"id":9,"task":"Final: full verification, screenshots, packaging check, summary report","status":"pending","depends_on":[8],"files":[],"priority":3}

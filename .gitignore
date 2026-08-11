@@ -1,0 +1,34 @@
+﻿# Unreal Engine
+Intermediate/
+DerivedDataCache/
+Saved/
+Binaries/
+Build/
+.vs/
+*.suo
+*.pdb
+*.idb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+*.obj
+*.pch
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Loop tracking files
+_loop/budget.json
+_loop/ledger.jsonl
+_loop/queue.jsonl
+
+# Documentation exports
+*.json
+*.docx
