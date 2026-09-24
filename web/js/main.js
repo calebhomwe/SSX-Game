@@ -90,7 +90,7 @@ async function boot() {
   renderer.render(world.scene, camera);
   $('loading').classList.remove('show');
   toTitle();
-  window.__game = { state: () => state, player: () => player, racers: () => racers, timelapse: (n) => { QA_STEPS = n; } };
+  window.__game = { state: () => state, player: () => player, racers: () => racers, timelapse: (n) => { QA_STEPS = n; }, hold: (b) => { paused = b; }, height: () => player.pos.y - heightAt(player.pos.x, player.pos.z) };
   requestAnimationFrame(loop);
 }
 
@@ -281,7 +281,7 @@ function chaseCam(dt, r) {
   const want = hv.lengthSq() > 0.01 ? hv.normalize().multiplyScalar(w).addScaledVector(fall, 1 - w).normalize() : fall;
   camState.dir.lerp(want, 1 - Math.exp(-dt * (r.grounded ? 3.2 : 1.2))).normalize();
   const sp = r.speed;
-  const dist = (portrait ? 7.4 : 5.6) + sp * 0.05 + (r.grounded ? 0 : 1.2);
+  const dist = (portrait ? 7.4 : 5.4) + sp * 0.04 + (r.grounded ? 0 : 0.4);
   const height = (portrait ? 3.0 : 2.1) + (r.grounded ? 0 : 0.8);
   const target = _w.copy(r.pos).addScaledVector(camState.dir, -dist);
   const gh = heightAt(target.x, target.z);
@@ -306,10 +306,12 @@ function titleCam(t) {
   const r = racers[0] || { pos: new THREE.Vector3(centerX(3), heightAt(centerX(3), -3), -3) };
   const p = r.pos;
   const portrait = innerHeight > innerWidth;
-  const a = 0.9 + Math.sin(t * 0.09) * 0.55;
-  const R = portrait ? 7.5 : 5.2;
-  camera.position.set(p.x + Math.sin(a) * R - (portrait ? 0 : 1.2), p.y + 1.25 + Math.sin(t * 0.13) * 0.25, p.z + Math.cos(a) * R);
-  camera.lookAt(p.x - (portrait ? 0 : 1.9), p.y + (portrait ? 0.5 : 1.0), p.z - 2.5);
+  // front three-quarter view of the player (who faces the toe side, +x), peaks behind
+  const a = 1.2 + Math.sin(t * 0.09) * 0.22;
+  const R = portrait ? 6.8 : 4.6;
+  camera.position.set(p.x + Math.sin(a) * R, p.y + 1.5 + Math.sin(t * 0.13) * 0.2, p.z + Math.cos(a) * R);
+  const side = portrait ? 0 : 1.6;
+  camera.lookAt(p.x - Math.cos(a) * side, p.y + (portrait ? 0.4 : 1.05), p.z + Math.sin(a) * side);
   camera.fov = portrait ? 62 : 50; camera.updateProjectionMatrix();
 }
 function finishCam(dt, t) {
@@ -476,7 +478,7 @@ function loop() {
     let steps = 0;
     const inp = readInput();
     while (acc >= STEP - 1e-9 && steps < (QA_STEPS || 6)) {
-      player.step(STEP, state === 'finish' ? { steer: 0, brake: player.speed > 5, tuck: false } : inp);
+      player.step(STEP, state === 'finish' ? { steer: 0, brake: player.speed > 5, tuck: false } : (AUTOPLAY ? readInput() : inp));
       racerFx(0, player, STEP);
       ais.forEach((ai, k) => { const r = racers[k + 1]; r.step(STEP, ai.input(STEP, player.s, true)); racerFx(k + 1, r, STEP); });
       acc -= STEP; steps++;

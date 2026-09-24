@@ -1,8 +1,10 @@
-"""Offline impostor baker for the Poly Haven fir_tree_01 model.
+"""Offline impostor baker for Poly Haven tree models (fir_tree_01, fir_sapling_medium).
 
-Usage: python3 bake_impostors.py <out_dir> <model path under .bake/> <prefix>
-Needs the static server on :8765 and the model at SSX-Game/.bake/fir/fir_tree_01.gltf
-Writes fir_albedo.webp (RGBA) and fir_normal.webp (RGB) atlases: 8 views x 3 variants.
+Usage: python3 bake_impostors.py <out_dir> <model path under SSX-Game/.bake/> <prefix>
+Needs the static server on :8765 serving /home/user and the glTF (1k) downloaded
+into SSX-Game/.bake/ (git-ignored; the source models are 70-480 MB).
+Writes <prefix>_albedo.webp (RGBA) and <prefix>_normal.webp (RGB): 8 views x N variants.
+The game ships both bakes stacked into assets/trees/conifers_*.webp.
 """
 import asyncio, base64, io, json, sys
 import numpy as np

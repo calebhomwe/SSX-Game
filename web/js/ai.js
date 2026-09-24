@@ -26,7 +26,8 @@ export class AIDriver {
       const s = r.s + ahead, v = this.line(s);
       const tx = centerX(s) + v, tz = -s;
       const want = Math.atan2(tx - r.pos.x, -(tz - r.pos.z));
-      let d = want - r.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+      const head = r.speed > 2 ? Math.atan2(r.vel.x, -r.vel.z) : r.yaw;
+      let d = want - head; d = Math.atan2(Math.sin(d), Math.cos(d));
       inp.steer = clamp(d * 2.6, -1, 1);
       inp.tuck = Math.abs(inp.steer) < 0.35;
       const gap = r.s - playerS;
@@ -43,7 +44,7 @@ export class AIDriver {
       }
       this.air.t += dt;
       const height = r.pos.y - heightAt(r.pos.x, r.pos.z);
-      const settle = r.vel.y < 0 && height < 1.6 + Math.max(0, -r.vel.y) * 0.18;
+      const settle = r.vel.y < 0 && height < Math.max(2.5, -r.vel.y * 0.9);
       if (this.air.spin && this.air.t < this.air.spinT && !settle) inp.steer = this.air.spin;
       if (this.air.grab && this.air.t > 0.12 && !settle) { inp.grab = true; inp.grabType = this.air.gt; }
     }

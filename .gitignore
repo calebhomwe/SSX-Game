@@ -36,3 +36,6 @@ _loop/queue.jsonl
 # web build scratch
 .bake/
 !web/**/*.json
+node_modules/
+web/qa/refs/
+web/qa/side_by_side.jpg

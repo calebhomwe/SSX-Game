@@ -47,7 +47,7 @@ const y0tab = new Float32Array(N);
     else a = 18 + 3 * Math.sin(s / 130) + 2 * Math.sin(s / 47 + 1);
     for (const k of KICKERS) {
       if (s > k.s - 70 && s < k.s - 4) a = Math.min(a, 12);   // flatter approach
-      if (s > k.s + 4 && s < k.s + 48) a = Math.max(a, 23 + k.h * 0.8); // steep landing
+      if (s > k.s + 4 && s < k.s + 75) a = Math.max(a, 21 + k.h * 0.6); // steep landing
     }
     if (s > LENGTH - 60) a = 11;
     if (s > LENGTH + 10) a = 4 + 3 * smoothstep(LENGTH + 120, LENGTH + 500, s);
@@ -134,23 +134,29 @@ function landform(x, z, s, v) {
   h += smoothstep(-60, -700, s) * 120 * (1 - smoothstep(300, 900, a));
   // the valley keeps dropping away below the finish
   h -= smoothstep(LENGTH + 300, LENGTH + 3000, s) * 350;
-  // peaks: sharp exponential cones carved by ridged noise
+  // peaks: pyramidal massifs (faces + aretes) carved by ridged noise
   let pk = 0;
-  for (const p of PEAKS) {
-    const d = Math.hypot(x - p.x, z - p.z);
-    if (d > p.r * 6) continue;
-    const c = Math.max(0, Math.exp(-d / p.r) - Math.exp(-6));
-    pk = Math.max(pk, p.h * c);
+  for (let i = 0; i < PEAKS.length; i++) {
+    const p = PEAKS[i];
+    const dx = x - p.x, dz = z - p.z;
+    const base = p.r * 2.7;
+    if (Math.abs(dx) > base * 1.5 || Math.abs(dz) > base * 1.5) continue;
+    const th = i * 0.7 + 0.3, c = Math.cos(th), sn = Math.sin(th);
+    const rx = dx * c - dz * sn, rz = dx * sn + dz * c;
+    const de = Math.hypot(dx, dz), dc = Math.max(Math.abs(rx), Math.abs(rz)) * 1.08;
+    const d = de * 0.45 + dc * 0.55;
+    const k = Math.max(0, 1 - d / base);
+    pk = Math.max(pk, p.h * Math.pow(k, 1.55));
   }
   pk *= smoothstep(120, 700, a);
   if (pk > 1) {
-    const r = ridged(x / 900 + 3.1, z / 900 - 1.7, 6);
-    const w = fbm(x / 260, z / 260, 3);
-    h += pk * (0.72 + 0.45 * r) + w * 25 * Math.min(1, pk / 200);
+    const r = ridged(x / 700 + 3.1, z / 700 - 1.7, 6);
+    const w = fbm(x / 230, z / 230, 3);
+    h += pk * (0.8 + 0.32 * r) + w * 30 * Math.min(1, pk / 200);
   }
   // distant broad range filling the horizon
   const far = smoothstep(4000, 7000, Math.hypot(x, z + 1100));
-  if (far > 0) h += far * (ridged(x / 2200 + 9.2, z / 2200 + 1.3, 6) * 1300 + 100);
+  if (far > 0) h += far * ((ridged(x / 2400 + 9.2, z / 2400 + 1.3, 6) * 0.55 + (fbm(x / 3000, z / 3000, 4) * 0.5 + 0.5) * 0.45) * 1400 + 50);
   return h * near;
 }
 

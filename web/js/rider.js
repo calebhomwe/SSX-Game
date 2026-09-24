@@ -168,7 +168,7 @@ function buildBoard(pal) {
   geo.computeVertexNormals();
   // planar UV for top graphic
   const uv = geo.attributes.uv;
-  for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + half) / L, (p.getZ(i) + tipW) / (2 * tipW));
+  for (let i = 0; i < p.count; i++) uv.setXY(i, 1 - (p.getX(i) + half) / L, (p.getZ(i) + tipW) / (2 * tipW));
   const top = new THREE.MeshStandardMaterial({ map: boardTexture(pal.board), roughness: 0.35, metalness: 0.05 });
   const side = new THREE.MeshStandardMaterial({ color: 0x9aa3ad, roughness: 0.3, metalness: 0.9 });
   const mesh = new THREE.Mesh(geo, [top, side]);

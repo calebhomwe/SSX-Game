@@ -1,7 +1,7 @@
 // Board physics shared by the player and the rivals: slope-following carving,
 // ollies, airtime with spins/flips/grabs, rail grinds, landings and crashes.
 import * as THREE from 'three';
-import { heightAt, normalAt, centerX, halfWidth, LENGTH, RUNOUT, RAILS } from './course.js';
+import { heightAt, normalAt, centerX, halfWidth, LENGTH, RUNOUT, RAILS, KICKERS } from './course.js';
 import { clamp, lerp } from './noise.js';
 
 const G = 9.81;
@@ -114,9 +114,24 @@ export class Racer {
     if (!inp.jump) this.charge = Math.max(0, this.charge - dt * 3);
     // integrate + stick to the ground unless the terrain falls away (kicker lips)
     this.pos.addScaledVector(this.vel, dt);
+    // kicker lips: launch along the lip angle (the lip is too sharp for the
+    // ground sampler to catch reliably at speed)
+    const s0 = -this.lastPos.z, s1 = -this.pos.z;
+    for (const k of KICKERS) {
+      if (s0 < k.s - 0.2 && s1 >= k.s - 0.2 && Math.abs(this.pos.x - centerX(s1) - k.v) < k.w - 0.8 && sp > 6) {
+        const hv = _t.set(this.vel.x, 0, this.vel.z).normalize();
+        const ang = (12 + k.h * 1.2) * Math.PI / 180;
+        const out = Math.min(sp, 26) * 0.74;
+        this.vel.set(hv.x * Math.cos(ang) * out, Math.sin(ang) * out, hv.z * Math.cos(ang) * out);
+        this.pos.y = heightAt(this.pos.x, this.pos.z) + 0.05;
+        this.takeoff();
+        this.events.push({ type: 'launch', kicker: true });
+        return;
+      }
+    }
     const h = heightAt(this.pos.x, this.pos.z);
     const gap = this.pos.y - h;
-    const thresh = 0.1 + sp * 0.004;
+    const thresh = 0.25 + sp * 0.01;
     if (gap > thresh && this.vel.y > -sp * 0.35) {
       this.takeoff();
       this.events.push({ type: 'launch' });
@@ -151,13 +166,13 @@ export class Racer {
     let flipIn = (inp.tuck ? 1 : 0) - (inp.brake ? 1 : 0);
     if (this.airTime < 0.12) flipIn = 0;
     this.flipVel = lerp(this.flipVel, flipIn * 5.8, 1 - Math.exp(-dt * 5));
-    const lowAndFalling = height < 2.2 && this.vel.y < 0;
+    const lowAndFalling = this.vel.y < 0 && height < Math.max(2, -this.vel.y * 0.75);
     if (lowAndFalling && Math.abs(steer) < 0.5) {
       // settle to the nearest landable orientation
       const vy = Math.atan2(this.vel.x, -this.vel.z);
       const d0 = wrapPi(this.yaw - vy), d1 = wrapPi(this.yaw - vy - Math.PI);
       const d = Math.abs(d0) < Math.abs(d1) ? d0 : d1;
-      this.spinVel = lerp(this.spinVel, -d * 7, 1 - Math.exp(-dt * 10));
+      this.spinVel = lerp(this.spinVel, -d * 9, 1 - Math.exp(-dt * 14));
     }
     if (lowAndFalling && flipIn === 0) {
       const fr = wrapPi(this.flip);
@@ -191,14 +206,14 @@ export class Racer {
     this.impact = clamp(vn / 10, 0, 1.5);
     this.land = 1;
     const wasGrabbing = this.grab > 0.55;
-    if (misalign > 0.62 || flipErr > 0.75 || vn > 17) {
+    if (misalign > 0.62 || flipErr > 0.75 || vn > 21) {
       this.crash(misalign > 0.62 ? 'Caught an edge' : flipErr > 0.75 ? 'Over-rotated' : 'Flat landing');
       return;
     }
     // snap the nose to travel (or switch) direction
     if (d1 < d0) this.yaw = vyaw + Math.PI; else this.yaw = vyaw;
     this.vel.addScaledVector(n, -this.vel.dot(n));
-    this.vel.multiplyScalar(wasGrabbing ? 0.82 : 0.97);
+    if (this.airTime > 0.35) this.vel.multiplyScalar(wasGrabbing ? 0.85 : 0.97);
     this.scoreAir(wasGrabbing, misalign);
     this.events.push({ type: 'land', impact: this.impact, air: this.airTime });
     this.flip = 0; this.spin = 0;
@@ -224,7 +239,7 @@ export class Racer {
       parts.push((this.grabTime > 0.7 ? 'Tweaked ' : '') + names.join(' to '));
       pts += 180 * names.length + 420 * Math.min(this.grabTime, 2);
     }
-    if (air > 0.9 && parts.length === 0) { parts.push('Big Air'); pts += Math.round(air * 90); }
+    if (air > 1.25 && parts.length === 0) { parts.push('Big Air'); pts += Math.round(air * 90); }
     else if (air > 0.9) pts += Math.round(air * 70);
     if (!parts.length) return;
     if (sketchy) pts *= 0.5;

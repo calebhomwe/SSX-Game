@@ -27,6 +27,7 @@ export class Forest {
       vertexShader: VERT, fragmentShader: FRAG,
       fog: true, side: THREE.DoubleSide,
     });
+    this.material.alphaToCoverage = quality.name !== 'Low';
     this.material.uniforms.tAlb.value = tex.treeA;
     this.material.uniforms.tNor.value = tex.treeN;
     this.material.uniforms.uCells.value = cells;
@@ -143,15 +144,22 @@ varying vec2 vUv0; varying vec2 vUv1; varying float vFr;
 varying vec3 vRight; varying vec3 vFwd; varying float vSnow; varying float vTint; varying float vH; varying float vDist;
 #include <common>
 #include <fog_pars_fragment>
-vec4 alb(vec2 uv){ return texture2D(tAlb, uv); }
-vec3 nor(vec2 uv){ return texture2D(tNor, uv).xyz; }
+vec2 gDx; vec2 gDy;
+vec4 alb(vec2 uv){ return textureGrad(tAlb, uv, gDx, gDy); }
+vec3 nor(vec2 uv){ return textureGrad(tNor, uv, gDx, gDy).xyz; }
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 void main(){
   // stochastic cross-fade between the two nearest baked views: one fetch per map
+  gDx = dFdx(vUv0); gDy = dFdy(vUv0);
   float hs = hash12(gl_FragCoord.xy);
-  vec2 uvv = vFr > hs ? vUv1 : vUv0;
+  vec2 uvv = vFr > 0.5 + (hs - 0.5) * 0.25 ? vUv1 : vUv0;
   vec4 a = alb(uvv);
-  if (a.a < 0.5) discard;
+  // keep coverage in the small mips so distant trees do not thin out, then sharpen
+  vec2 dxs = gDx * vec2(2048.0, 3072.0), dys = gDy * vec2(2048.0, 3072.0);
+  float mip = max(0.0, 0.5 * log2(max(dot(dxs, dxs), dot(dys, dys))));
+  float al = a.a * (1.0 + mip * 0.28);
+  al = (al - 0.5) / max(length(vec2(dFdx(a.a), dFdy(a.a))) * (1.0 + mip * 0.28), 1e-4) + 0.5;
+  if (al < 0.5) discard;
   vec3 nb = normalize(nor(uvv) * 2.0 - 1.0);
   vec3 n = normalize(vRight * nb.x + vec3(0.0, 1.0, 0.0) * nb.y + vFwd * nb.z);
   // albedo: cooler, deeper alpine green, per-tree variation
@@ -166,7 +174,7 @@ void main(){
   float ao = mix(0.45, 1.0, smoothstep(0.0, 0.9, vH)) * mix(0.75, 1.0, snow);
   vec3 amb = mix(uGround, uSky, n.y * 0.5 + 0.5) * 0.9;
   vec3 lit = col * (uSunCol * ndl * mix(0.75, 1.0, ao) + amb * ao);
-  gl_FragColor = vec4(lit, 1.0);
+  gl_FragColor = vec4(lit, clamp(al, 0.0, 1.0));
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
   #include <fog_fragment>

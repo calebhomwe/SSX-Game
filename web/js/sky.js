@@ -4,9 +4,9 @@ import * as THREE from 'three';
 import { HDRLoader } from '../vendor/three/jsm/loaders/HDRLoader.js';
 
 // Sun: elevation taken from the HDRI (28.3 deg); azimuth chosen so the sun sits
-// to the right of and slightly behind the fall line: side light on the slope,
-// a deep blue sky down the run and a sunlit rider.
-const EL = 28.3 * Math.PI / 180, AZ = 112 * Math.PI / 180;
+// square to the right of the fall line: side light models the peaks and the
+// slope while the sky down the run stays a deep blue.
+const EL = 28.3 * Math.PI / 180, AZ = 86 * Math.PI / 180;
 export const SUN_DIR = new THREE.Vector3(Math.sin(AZ) * Math.cos(EL), Math.sin(EL), -Math.cos(AZ) * Math.cos(EL)).normalize();
 const SUN_U_IN_HDRI = 0.59985;
 export const SKY_U_OFFSET = SUN_U_IN_HDRI - (Math.atan2(SUN_DIR.z, SUN_DIR.x) / (Math.PI * 2) + 0.5);
@@ -14,9 +14,9 @@ export const SKY_V_SPAN = 0.52; // the backplate keeps the top 52% of the equire
 
 // Fog colours in output (display) space: fog is applied after tonemapping in three.
 export const FOG = {
-  haze: new THREE.Color(0.72, 0.81, 0.90),
+  haze: new THREE.Color(0.66, 0.77, 0.90),
   sun: new THREE.Color(0.99, 0.95, 0.86),
-  density: 0.00024,   // a
+  density: 0.00011,   // a
   falloff: 0.0011,    // b (per metre of altitude)
   refY: -200,
 };

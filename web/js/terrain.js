@@ -50,7 +50,11 @@ float gPiste; float gRock; vec3 gSparkN; float gSparkMask; float gV; float gCam;
   float rn = texture2D(tSnowD, wp.xz*0.0021).r;
   float rn2 = texture2D(tSnowD, wp.xz*0.013 + 0.61).r;
   float steep = 1.0 - gn.y;
+  #ifdef PISTE
   gRock = smoothstep(0.34, 0.39, steep + (rn-0.5)*0.30 + (rn2-0.5)*0.22) * (1.0 - gPiste);
+#else
+  gRock = smoothstep(0.24, 0.29, steep + (rn-0.5)*0.34 + (rn2-0.5)*0.26);
+#endif
   vec3 snowMacro = texture2D(tSnowD, wp.xz*0.017 + 0.37).rgb;
   float det = dot(snowMacro, vec3(0.333));
 #ifdef PISTE
@@ -63,8 +67,8 @@ float gPiste; float gRock; vec3 gSparkN; float gSparkMask; float gV; float gCam;
   vec3 psc = wp * (${rockScale});
   vec3 rockCol = texture2D(tRockD, psc.zy).rgb*w3.x + texture2D(tRockD, psc.xz).rgb*w3.y + texture2D(tRockD, psc.xy).rgb*w3.z;
   rockCol = mix(rockCol, vec3(dot(rockCol, vec3(0.33))), 0.35) * mix(0.8, 1.15, rn2) * vec3(0.95, 0.97, 1.02);
-  float dust = smoothstep(0.35, 0.8, gn.y + (rn2 - 0.5)*0.6);
-  diffuseColor.rgb = mix(snowCol, mix(rockCol, snowCol*0.95, dust*0.55), gRock);
+  float dust = smoothstep(0.45, 0.85, gn.y + (rn2 - 0.5)*0.6);
+  diffuseColor.rgb = mix(snowCol, mix(rockCol * 0.8, snowCol*0.95, dust*0.6), gRock);
 `)
       .replace('#include <roughnessmap_fragment>', `
   float roughnessFactor = mix(mix(0.72, 0.5, gPiste), 0.85, gRock);
@@ -174,31 +178,30 @@ export function buildRibbon(q, material) {
   return group;
 }
 
-// Coarse massif around everything; sinks under the ribbon so the ribbon wins.
+// Surrounding massif as a polar grid centred on the run: fine near the course,
+// ~25-60 m cells out at the peaks. Sinks under the ribbon so the ribbon wins.
 export function buildMassif(q, material) {
   const group = new THREE.Group();
-  const size = 15000, cx = 0, cz = -1100;
-  const n = q.massifRes;
-  const chunks = 6, per = Math.ceil((n - 1) / chunks);
-  const step = size / (n - 1);
+  const cx = 0, cz = -1100;
+  const nA = q.massifAng, nR = q.massifRings;
+  const r0 = 60, r1 = 7600;
+  const radii = [];
+  for (let j = 0; j < nR; j++) radii.push(r0 * Math.pow(r1 / r0, j / (nR - 1)));
   const hfn = (x, z) => {
     let h = heightAt(x, z);
     const s = -z;
-    const inRib = s > -250 && s < LENGTH + RUNOUT + 370;
-    if (inRib) { const v = Math.abs(x - centerX(s)); h -= 14 * (1 - smoothstep(200, 236, v)); }
+    if (s > -250 && s < LENGTH + RUNOUT + 370) { const v = Math.abs(x - centerX(s)); h -= 14 * (1 - smoothstep(200, 236, v)); }
     return h;
   };
-  for (let cj = 0; cj < chunks; cj++) for (let ci = 0; ci < chunks; ci++) {
-    const i0 = ci * per, j0 = cj * per;
-    const nxx = Math.min(per, n - 1 - i0) + 1, nzz = Math.min(per, n - 1 - j0) + 1;
-    if (nxx < 2 || nzz < 2) continue;
-    const heights = new Float32Array(nxx * nzz);
-    const posFn = (i, j) => [cx - size / 2 + (i0 + i) * step, cz - size / 2 + (j0 + j) * step];
-    for (let j = 0; j < nzz; j++) for (let i = 0; i < nxx; i++) { const p = posFn(i, j); heights[j * nxx + i] = hfn(p[0], p[1]); }
-    const g = gridGeometry(nxx, nzz, posFn, heights);
-    const m = new THREE.Mesh(g, material);
-    m.receiveShadow = false;
-    group.add(m);
+  const sectors = 12, perA = nA / sectors;
+  const bands = [[0, Math.floor(nR * 0.55)], [Math.floor(nR * 0.55), Math.floor(nR * 0.8)], [Math.floor(nR * 0.8), nR - 1]];
+  for (let sct = 0; sct < sectors; sct++) for (const [j0, j1] of bands) {
+    const nx = perA + 1, nz = j1 - j0 + 1;
+    const heights = new Float32Array(nx * nz);
+    const posFn = (i, j) => { const a = (sct * perA + i) / nA * Math.PI * 2, r = radii[j0 + j]; return [cx + Math.cos(a) * r, cz + Math.sin(a) * r]; };
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const p = posFn(i, j); heights[j * nx + i] = hfn(p[0], p[1]); }
+    const g = gridGeometry(nx, nz, posFn, heights, true);
+    group.add(new THREE.Mesh(g, material));
   }
   return group;
 }
@@ -216,7 +219,7 @@ export function buildPanorama(material) {
       const a = i / na * Math.PI * 2;
       const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
       const inner = heightAt(x, z);
-      const big = ridged(x / 4200 + 11.3, z / 4200 + 4.1, 7) * 2600 + fbm(x / 2000, z / 2000, 3) * 400 - 700;
+      const big = ridged(x / 4200 + 11.3, z / 4200 + 4.1, 7) * 1700 + (fbm(x / 5000, z / 5000, 4) * 0.5 + 0.5) * 1500 + fbm(x / 1500, z / 1500, 3) * 250 - 600;
       const w = smoothstep(0, 0.35, t);
       let h = inner * (1 - w) + big * w;
       pos.push(x, h, z);
