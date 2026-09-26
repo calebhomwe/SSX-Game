@@ -1,0 +1,21 @@
+name: Export licensed snow assets
+on:
+  push:
+    branches: [codex/export-licensed-assets]
+permissions:
+  contents: read
+jobs:
+  assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: licensed-snow-assets
+          path: |
+            web/assets/hdri/horn-koppe_snow_1k.hdr
+            web/assets/tex/snow_02_nor_gl_1k.jpg
+            web/assets/tex/snow_01_nor_gl_1k.jpg
+            web/assets/trees/conifers_albedo.webp
+            web/assets/trees/conifers_normal.webp
+          retention-days: 1
