@@ -32,3 +32,10 @@ _loop/queue.jsonl
 # Documentation exports
 *.json
 *.docx
+
+# web build scratch
+.bake/
+!web/**/*.json
+node_modules/
+web/qa/refs/
+web/qa/side_by_side.jpg

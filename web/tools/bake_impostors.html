@@ -1,0 +1,61 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Impostor baker</title>
+<script type="importmap">{"imports":{"three":"../vendor/three/build/three.module.min.js"}}</script>
+</head><body style="margin:0;background:#000">
+<script type="module">
+// Offline tool: renders the Poly Haven fir_tree_01 model (3 variants) from 8 azimuths
+// into albedo+alpha and view-space-normal cells. Driven by tools/bake_impostors.py.
+import * as THREE from 'three';
+import { GLTFLoader } from '../vendor/three/jsm/loaders/GLTFLoader.js';
+const CW = 512, CH = 1024;
+const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true, alpha: true });
+renderer.setSize(CW, CH); renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(0x000000, 0);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
+const trees = [];
+const albedoMats = new Map(), normalMats = new Map();
+window.bakeInfo = null;
+new GLTFLoader().load(new URLSearchParams(location.search).get('src'), (g) => {
+  g.scene.traverse(o => {
+    if (o.isMesh) {
+      const m = o.material;
+      if (!albedoMats.has(m)) {
+        albedoMats.set(m, new THREE.MeshBasicMaterial({ map: m.map, side: THREE.DoubleSide, alphaTest: 0.5, transparent: false }));
+        normalMats.set(m, new THREE.MeshNormalMaterial({ normalMap: m.normalMap, side: THREE.DoubleSide }));
+      }
+    }
+  });
+  for (const child of [...g.scene.children]) {
+    const box = new THREE.Box3().setFromObject(child);
+    const c = box.getCenter(new THREE.Vector3());
+    const holder = new THREE.Group();
+    child.position.x -= c.x; child.position.z -= c.z; child.position.y -= box.min.y;
+    holder.add(child); holder.visible = false; scene.add(holder);
+    const size = box.getSize(new THREE.Vector3());
+    trees.push({ holder, size, name: child.name });
+  }
+  window.bakeInfo = trees.map(t => ({ name: t.name, w: t.size.x, d: t.size.z, h: t.size.y }));
+});
+window.bake = (ti, view, nviews, pass) => {
+  trees.forEach((t, i) => t.holder.visible = i === ti);
+  const t = trees[ti];
+  const r = Math.max(t.size.x, t.size.z) * 0.5 * 1.08;
+  const h = t.size.y * 1.02;
+  // half-extent: width r, height h/2 ; keep CW:CH = 1:2
+  const halfH = Math.max(h / 2, r * CH / CW);
+  const halfW = halfH * CW / CH;
+  cam.left = -halfW; cam.right = halfW; cam.top = halfH; cam.bottom = -halfH;
+  cam.updateProjectionMatrix();
+  const a = view / nviews * Math.PI * 2;
+  cam.position.set(Math.sin(a) * 60, halfH, Math.cos(a) * 60);
+  cam.lookAt(0, halfH, 0);
+  scene.overrideMaterial = null;
+  scene.traverse(o => { if (o.isMesh) o.material = (pass === 'albedo' ? albedoMats : normalMats).get(o.userData.orig || (o.userData.orig = o.material)); });
+  renderer.outputColorSpace = pass === 'albedo' ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
+  renderer.render(scene, cam);
+  return { url: renderer.domElement.toDataURL('image/png'), halfW, halfH };
+};
+</script></body></html>
