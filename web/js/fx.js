@@ -5,7 +5,7 @@ import { heightAt } from './course.js';
 
 const PVERT = /* glsl */`
 attribute float aSize; attribute float aAlpha; attribute float aShade;
-varying float vAlpha; varying float vShade;
+varying float vAlpha; varying float vShade; varying float vRot;
 uniform float uScale;
 #include <fog_pars_vertex>
 void main(){
@@ -13,18 +13,19 @@ void main(){
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
   gl_Position = projectionMatrix * mvPosition;
   gl_PointSize = aSize * uScale / max(0.5, -mvPosition.z);
-  vAlpha = aAlpha; vShade = aShade;
+  vAlpha = aAlpha; vShade = aShade; vRot = fract(aShade * 97.13) * 6.2831 + position.x * 0.37;
   #include <fog_vertex>
 }`;
 const PFRAG = /* glsl */`
-varying float vAlpha; varying float vShade;
-uniform vec3 uLit; uniform vec3 uShadow;
+varying float vAlpha; varying float vShade; varying float vRot;
+uniform vec3 uLit; uniform vec3 uShadow; uniform sampler2D tPuff;
 #include <common>
 #include <fog_pars_fragment>
 void main(){
   vec2 c = gl_PointCoord - 0.5;
-  float r = length(c);
-  float a = smoothstep(0.5, 0.12, r) * vAlpha;
+  float cs = cos(vRot), sn = sin(vRot);
+  vec2 rc = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs) + 0.5;
+  float a = texture2D(tPuff, rc).a * vAlpha * 1.4;
   if (a < 0.01) discard;
   // cheap volume: brighter toward the sun-facing top-left of each puff
   float lit = clamp(0.65 + (-c.x - c.y) * 0.9, 0.0, 1.0);
@@ -54,12 +55,24 @@ export class Particles {
     g.setAttribute('aSize', new THREE.BufferAttribute(this.size, 1).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('aAlpha', new THREE.BufferAttribute(this.alpha, 1).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('aShade', new THREE.BufferAttribute(this.shade, 1).setUsage(THREE.DynamicDrawUsage));
+    // irregular powder puff: a cluster of soft blobs
+    const pc = document.createElement('canvas'); pc.width = pc.height = 64;
+    const pg = pc.getContext('2d');
+    for (let i = 0; i < 26; i++) {
+      const a = Math.random() * 6.283, r = Math.random() * 16, x = 32 + Math.cos(a) * r, y = 32 + Math.sin(a) * r, rad = 5 + Math.random() * 11;
+      const g = pg.createRadialGradient(x, y, 0, x, y, rad);
+      g.addColorStop(0, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      pg.fillStyle = g; pg.fillRect(0, 0, 64, 64);
+    }
+    const puff = new THREE.CanvasTexture(pc);
     this.mat = new THREE.ShaderMaterial({
       uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
+        tPuff: { value: null },
         uScale: { value: 400 }, uLit: { value: new THREE.Color(2.3, 2.3, 2.35) }, uShadow: { value: new THREE.Color(0.95, 1.05, 1.3) },
       }]),
       vertexShader: PVERT, fragmentShader: PFRAG, transparent: true, depthWrite: false, fog: true,
     });
+    this.mat.uniforms.tPuff.value = puff;
     this.points = new THREE.Points(g, this.mat);
     this.points.frustumCulled = false;
     this.geo = g;
@@ -70,7 +83,7 @@ export class Particles {
     this.pos[i * 3] = x; this.pos[i * 3 + 1] = y; this.pos[i * 3 + 2] = z;
     this.vel[i * 3] = vx; this.vel[i * 3 + 1] = vy; this.vel[i * 3 + 2] = vz;
     this.life[i] = life; this.maxLife[i] = life; this.size0[i] = size;
-    this.shade[i] = opts.shade ?? 1; this.drag[i] = opts.drag ?? 2.2; this.grav[i] = opts.grav ?? 4.5;
+    this.shade[i] = (opts.shade ?? 1) + Math.random() * 0.01; this.drag[i] = opts.drag ?? 2.2; this.grav[i] = opts.grav ?? 4.5;
     this.alphaMul = 1;
   }
   update(dt) {
@@ -83,7 +96,7 @@ export class Particles {
       V[i * 3] *= d; V[i * 3 + 1] = V[i * 3 + 1] * d - this.grav[i] * dt; V[i * 3 + 2] *= d;
       P[i * 3] += V[i * 3] * dt; P[i * 3 + 1] += V[i * 3 + 1] * dt; P[i * 3 + 2] += V[i * 3 + 2] * dt;
       this.size[i] = this.size0[i] * (0.5 + t * 1.6);
-      this.alpha[i] = Math.min(1, t * 6) * (1 - t) * 0.75;
+      this.alpha[i] = Math.min(1, t * 8) * (1 - t) * (1 - t) * 1.1;
     }
     this.geo.attributes.position.needsUpdate = true;
     this.geo.attributes.aSize.needsUpdate = true;

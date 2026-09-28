@@ -287,7 +287,7 @@ function chaseCam(dt, r) {
   const gh = heightAt(target.x, target.z);
   target.y = Math.max(r.pos.y + height, gh + 1.4);
   if (!camState.init) { camState.pos.copy(target); camState.look.copy(r.pos); camState.init = true; }
-  camState.pos.lerp(target, 1 - Math.exp(-dt * 6));
+  camState.pos.lerp(target, 1 - Math.exp(-dt * 13));
   const look = _u.copy(r.pos).addScaledVector(camState.dir, 5 + sp * 0.12);
   look.y = r.pos.y + (portrait ? 0.2 : 0.6);
   camState.look.lerp(look, 1 - Math.exp(-dt * 9));
@@ -371,7 +371,7 @@ function racerFx(i, r, dt) {
         r.vel.x * 0.35 - _side.x * outside * (2 + Math.random() * 3) * s + (Math.random() - 0.5),
         1.2 + Math.random() * 2.4 * s,
         r.vel.z * 0.35 - _side.z * outside * (2 + Math.random() * 3) * s + (Math.random() - 0.5),
-        0.22 + Math.random() * 0.35, 0.6 + Math.random() * 0.7, { shade: 0.9 + Math.random() * 0.2 });
+        0.35 + Math.random() * 0.5, 0.6 + Math.random() * 0.7, { shade: 0.9 + Math.random() * 0.2 });
     }
   } else if (!r.grind) tr.cut();
   if (r.grind && Math.random() < 0.6) {
@@ -384,6 +384,7 @@ function racerFx(i, r, dt) {
   for (const e of r.events) handleEvent(r, e, i);
 }
 function burst(p, n, power, size = 0.5) {
+  n = Math.round(n * 1.5); size *= 1.1;
   for (let k = 0; k < n; k++) {
     const a = Math.random() * Math.PI * 2, s = Math.random() * power;
     fx.parts.emit(p.x, p.y + 0.2, p.z, Math.cos(a) * s, 1 + Math.random() * power * 0.8, Math.sin(a) * s, size * (0.6 + Math.random()), 0.8 + Math.random() * 0.9, { shade: 0.85 + Math.random() * 0.3, drag: 1.8 });

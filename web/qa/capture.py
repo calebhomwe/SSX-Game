@@ -72,7 +72,7 @@ async def main(out, mode, q):
         await frames(1)
         await shot('06_pause')
         await pg.evaluate('document.querySelector("#btnResume").click(); __game.timelapse(600)')
-        await until('__game.state() === "finish"')
+        await until('__game.state() === "finish" || __game.state() === "results"')
         await pg.evaluate('__game.timelapse(30)')
         await until('__game.state() === "results"')
         await frames(2)
