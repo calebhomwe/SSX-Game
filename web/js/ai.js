@@ -19,7 +19,7 @@ export class AIDriver {
   input(dt, playerS, started) {
     const r = this.r;
     const inp = { steer: 0, tuck: false, brake: false, jump: false, grab: false, grabType: 0, boost: false };
-    if (!started || r.finished && r.s > r.s + 0) { if (r.finished) inp.brake = r.speed > 6; return inp; }
+    if (!started || r.finished) { if (r.finished) inp.brake = r.speed > 6; return inp; }   // finishers stop racing and coast to a stop
     if (r.grounded || r.grind) {
       this.air = null;
       const ahead = 10 + r.speed * 0.55;

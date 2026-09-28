@@ -51,16 +51,17 @@ export class Racer {
     if (this.invuln > 0) this.invuln -= dt;
     if (this.comboT > 0) { this.comboT -= dt; if (this.comboT <= 0) this.combo = 0; }
     this.lastPos.copy(this.pos);
+    // boost: resolved before movement, so this frame's input drives this frame's push. It only pushes
+    // on the ground (stepGround), so it only drains the meter there too.
+    this.boosting = false;
+    if (inp.boost && this.boost > 0.02 && !this.finished && this.crashT <= 0 && this.grounded && !this.grind) {
+      this.boosting = true; this.boost = Math.max(0, this.boost - dt * 0.28);
+    }
     if (this.crashT > 0) return this.stepCrash(dt);
     if (this.grind) return this.stepGrind(dt, inp);
     if (this.grounded) this.stepGround(dt, inp); else this.stepAir(dt, inp);
     this.s = -this.pos.z; this.v = this.pos.x - centerX(this.s);
     const sp = this.speed; if (sp > this.topSpeed) this.topSpeed = sp;
-    // boost
-    this.boosting = false;
-    if (inp.boost && this.boost > 0.02 && !this.finished) {
-      this.boosting = true; this.boost = Math.max(0, this.boost - dt * 0.28);
-    }
     this.checkColliders();
     if (!this.finished && this.s >= LENGTH) { this.finished = true; this.finishTime = this.time; this.events.push({ type: 'finish' }); }
   }
