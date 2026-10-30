@@ -1,4 +1,5 @@
 #include "SSXPureSnowboarder.h"
+#include "SSXPureContact.h"
 #include "SSXPureParticle.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
@@ -141,7 +142,7 @@ void ASSXPureSnowboarder::SetupPlayerInputComponent(UInputComponent* PIC)
 
 void ASSXPureSnowboarder::MoveForward(float V) { InputFwd = V; }
 void ASSXPureSnowboarder::MoveRight(float V) { InputRight = V; }
-void ASSXPureSnowboarder::DoJump() { bJumpPressed = true; }
+void ASSXPureSnowboarder::DoJump() { if (!bIsAirborne) bJumpPressed = true; }
 void ASSXPureSnowboarder::SpinL() { if (bIsAirborne) TotalSpin -= 90.f; }
 void ASSXPureSnowboarder::SpinR() { if (bIsAirborne) TotalSpin += 90.f; }
 
@@ -182,11 +183,13 @@ void ASSXPureSnowboarder::UpdatePhysics(float DT)
 	P.AddIgnoredActor(this);
 	bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Loc, Loc - FVector(0, 0, 250.f), ECC_WorldStatic, P);
 
-	if (bHit)
+	const float GroundDistance = bHit ? (Hit.ImpactPoint - Loc).Size() : 0.f;
+	const bool bGrounded = IsBoardGrounded(bHit, GroundDistance, bIsAirborne,
+		bHit ? FVector::DotProduct(Vel, Hit.ImpactNormal) : 0.f);
+	if (bGrounded)
 	{
 		GroundNormal = Hit.ImpactNormal;
-		float Dist = (Hit.ImpactPoint - Loc).Size();
-		if (Dist < 90.f && !bIsAirborne)
+		if (!bIsAirborne)
 		{
 			BoardMesh->SetWorldLocation(FMath::Lerp(Loc, Hit.ImpactPoint + GroundNormal * 58.f, DT * 12.f));
 		}
@@ -210,8 +213,7 @@ void ASSXPureSnowboarder::UpdatePhysics(float DT)
 		{
 			BoardMesh->AddImpulse(FVector(0, 0, 1) * 50000.f + Fwd * 12000.f);
 			bIsAirborne = true;
-			bJumpPressed = false;
-			AirTime = 0.f;
+			AirTime = DT;
 		}
 		else
 		{
@@ -236,6 +238,8 @@ void ASSXPureSnowboarder::UpdatePhysics(float DT)
 		T.Roll = FMath::FInterpTo(R.Roll, -InputRight * 35.f, DT, 2.5f);
 		BoardMesh->SetWorldRotation(FMath::RInterpTo(R, T, DT, 3.f));
 	}
+	// An airborne press must not trigger an unexpected jump on landing.
+	bJumpPressed = false;
 }
 
 void ASSXPureSnowboarder::UpdateTricks(float DT)
@@ -261,12 +265,12 @@ void ASSXPureSnowboarder::UpdateTricks(float DT)
 		TotalFlip += Norm(D.Y);
 		TotalSpin += Norm(D.Z);
 	}
-	else if (AirTime > 0.3f)
+	else if (AirTime > 0.f)
 	{
 		// Landed: bank the trick.
 		int32 Sp = FMath::Abs(TotalSpin) / 360.f;
 		int32 Fl = FMath::Abs(TotalFlip) / 360.f;
-		if (Sp > 0 || Fl > 0 || AirTime > 0.8f)
+		if (AirTime > 0.3f && (Sp > 0 || Fl > 0 || AirTime > 0.8f))
 		{
 			int32 TS = (Sp * 100 + Fl * 150 + FMath::FloorToInt(AirTime * 60.f)) * ComboMult;
 			TotalScore += TS;
@@ -281,7 +285,7 @@ void ASSXPureSnowboarder::UpdateTricks(float DT)
 			TrickDisplayTimer = 2.f;
 			ComboMult = FMath::Min(ComboMult + 0.5f, 5.f);
 		}
-		else
+		else if (AirTime > 0.3f)
 		{
 			ComboMult = 1.f;
 		}
